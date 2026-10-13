@@ -8,3 +8,4 @@ pkg/
 design/
 .cache/
 calibration*.json
+apps/sensorproxy/thor-sensorproxy

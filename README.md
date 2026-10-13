@@ -11,6 +11,7 @@ claimed supported merely because their SoC exposes FastRPC.
   both accelerometer and gyroscope return samples; InputPlumber depends on it.
 - `profiles/`: declarative device documentation and compatibility boundaries.
 - `apps/motion-lab/`: native GTK inspection and explicit user-local calibration.
+- `apps/sensorproxy/`: native SensorProxy bridge for desktop orientation.
 - `packaging/arch/thorch-motion/`: Arch recipe, pinned upstream patches and
   build metadata. Payload links reference the sole source rather than copies.
 

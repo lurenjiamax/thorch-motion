@@ -1,0 +1,19 @@
+[Unit]
+Description=Thor SSC SensorProxy orientation compatibility bridge (opt-in)
+Conflicts=iio-sensor-proxy.service
+After=dbus.service iio-sensor-proxy.service thorch-motion.service
+Requires=thorch-motion.service
+ConditionPathExists=/etc/thorch-motion/sensorproxy.env
+ConditionPathExists=/usr/lib/thorch-motion/ssc/libssc.so.2
+
+[Service]
+Type=simple
+User=root
+EnvironmentFile=/etc/thorch-motion/sensorproxy.env
+ExecStart=/usr/lib/thorch-motion/thor-sensorproxy --frame=${THOR_SENSOR_FRAME} --sample-hz=100 --process-ms=100 --debounce-ms=450
+TimeoutStopSec=15
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
