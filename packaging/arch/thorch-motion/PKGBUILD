@@ -1,0 +1,85 @@
+# Maintainer: Thorch contributors
+pkgname=thorch-motion
+pkgver=0.5.0
+pkgrel=6
+pkgdesc='Experimental opt-in AYN Thor SSC motion runtime (private device files required)'
+arch=(aarch64)
+url='https://github.com/linux-msm/hexagonrpc'
+license=('GPL-3.0-or-later')
+depends=(glibc json-c python libssc glib2 'libqmi>=1.33.4' protobuf-c)
+makedepends=(gcc pkgconf patch protobuf)
+_commit=dd9ac70c026e1bad93e8cffa3801255b8ceb551e
+_ssc_commit=0cf77b93b55752da34dca2dcecc06fca8665184b
+_ssc_patches=(libssc-placement-trace.patch
+              libssc-sample-rate-override.patch
+              libssc-cli-rate-capture.patch
+              libssc-reject-invalid-rotation.patch)
+source=("hexagonrpc-${_commit}.tar.gz::https://codeload.github.com/linux-msm/hexagonrpc/tar.gz/${_commit}"
+        '0001-sscregistrygen-ignore-non-json-inputs.patch'
+        '0002-hexagonrpcd-add-sns-registry-reverse-interface.patch'
+        '0003-hexagonrpcd-keep-listener-registration-open.patch'
+        '0004-hexagonrpcd-add-static-pd-option.patch'
+        '0005-hexagonrpcd-add-writable-hexagonfs.patch'
+        '0006-hexagonrpcd-support-writable-sensor-registry.patch'
+        '0007-hexagonrpcd-support-large-and-extended-callbacks.patch'
+        '0008-hexagonrpcd-enumerate-virtual-directories.patch'
+        "libssc-${_ssc_commit}-codeberg.tar.gz::https://codeberg.org/DylanVanAssche/libssc/archive/${_ssc_commit}.tar.gz"
+        "${_ssc_patches[@]}")
+sha256sums=('575bf34b8e2a51f851b078cc4b87db3c9bb121ce5849be765352b016756d63eb'
+            '6ab652128fe718e3516fa0cc473c12a94916e9c146614cbcab60b393b7293153'
+            '3b7d56c10f14199422946edc117a586938e08bdd51f58f4acde771b9448f4f28'
+            '441e2078ce103f7f15cd837b3d9a7af83a5295b78f35e18b13bb6e35689b5ee1'
+            'd6f8c42bcf15e21337c0bc966a535b7a347d0823492f5247671bf2181045b4ae'
+            '294a164aed7a4a7368fd536c02501fbaf09af2325f17ed74bd52e7bf3d4dd561'
+            '91a280b379f7ee76f10352b89127ea3f454bc5a7d3d97658f3453f33bf9fc794'
+            '8f139139312337c4599c73bb78b297bc3b4a86f37fe67fac3f8bd54e218e6f69'
+            '595648e17419e73f71285d2d0842ecfef9290623ca241c2ac98c6b89d5936121'
+            '716d6bd6b34d2d753060c6b54c9a87e34fae75b724c763bf9ef487efa3621587'
+            '278f98897d05d7a23866247ad2f9ab7bc61aa94077218a419b46296faa443750'
+            '1157d5391cdec7668a80483b7bd24d46d78aeeacadec5782525e95d3063315a6'
+            '122be51b2067d6591b11ead74d9470279b8b0ca9867acae54cf4e1cd47f38cb9'
+            '146cdf3d4c8f2ddfee66c8116815277a59c297ef6cbe0954c2f5e4a898915125')
+
+prepare() {
+  cd "hexagonrpc-${_commit}"
+  for patchfile in "${srcdir}"/000*.patch; do
+    patch --batch --forward --fuzz=2 -p1 < "${patchfile}"
+  done
+  cd "${srcdir}/libssc"
+  # Required final rotation rejection is checksum-pinned, never optional.
+  for patchfile in "${_ssc_patches[@]}"; do
+    patch --batch --forward --fuzz=0 -p1 < "${srcdir}/${patchfile}"
+  done
+}
+
+build() {
+  cd "hexagonrpc-${_commit}"
+  # Native daemon only: no Meson test targets, registry generator or DSP programs.
+  cc ${CFLAGS} -Iinclude libhexagonrpc/*.c hexagonrpcd/*.c \
+    $(pkg-config --cflags --libs json-c) ${LDFLAGS} -o hexagonrpcd-thor
+  bash "${startdir}/payload/build-private-ssc.sh" \
+    "${srcdir}/libssc" "${srcdir}/build-private-ssc"
+}
+
+package() {
+  install -Dm755 "hexagonrpc-${_commit}/hexagonrpcd-thor" "${pkgdir}/usr/lib/thorch-motion/hexagonrpcd"
+  install -Dm755 "build-private-ssc/libssc.so.2" "${pkgdir}/usr/lib/thorch-motion/ssc/libssc.so.2"
+  install -Dm755 "build-private-ssc/ssccli" "${pkgdir}/usr/lib/thorch-motion/ssc/ssccli"
+  install -Dm755 "${startdir}/payload/thorch-motion-capture" "${pkgdir}/usr/bin/thorch-motion-capture"
+  install -Dm755 "${startdir}/payload/thorch-motion-import" "${pkgdir}/usr/bin/thorch-motion-import"
+  install -Dm755 "${startdir}/payload/thorch-motion-supervisor" "${pkgdir}/usr/lib/thorch-motion/supervisor"
+  install -Dm644 "${startdir}/payload/thorch-motion.service" "${pkgdir}/usr/lib/systemd/system/thorch-motion.service"
+  install -Dm644 "hexagonrpc-${_commit}/COPYING" "${pkgdir}/usr/share/licenses/${pkgname}/COPYING"
+  install -Dm644 "libssc/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/libssc-LICENSE"
+  install -Dm644 "${startdir}/README.md" "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+  install -Dm644 "${startdir}/payload/PROVENANCE.md" "${pkgdir}/usr/share/doc/${pkgname}/PROVENANCE.md"
+  for patchfile in "${startdir}"/000*.patch; do
+    install -Dm644 "${patchfile}" "${pkgdir}/usr/share/doc/${pkgname}/patches/${patchfile##*/}"
+  done
+  for patchfile in "${_ssc_patches[@]}"; do
+    install -Dm644 "${startdir}/${patchfile}" "${pkgdir}/usr/share/doc/${pkgname}/patches/${patchfile}"
+  done
+  install -Dm644 "${startdir}/payload/build-private-ssc.sh" "${pkgdir}/usr/share/doc/${pkgname}/build-private-ssc.sh"
+  # No public libssc ABI, headers, pkg-config, loader configuration or global symlinks.
+  # Intentionally no install hook, enable/start operation or private runtime files.
+}

@@ -1,0 +1,29 @@
+[Unit]
+Description=Experimental AYN Thor SSC sensor runtime
+ConditionPathExists=/dev/fastrpc-adsp
+ConditionPathExists=/var/lib/aynthor/motion/runtime-root/sensors/sns_reg_version
+ConditionPathExists=!/var/lib/aynthor/motion/runtime-root/.importing
+After=sound.target
+RequiresMountsFor=/var/lib/aynthor/motion/runtime-root
+Conflicts=suspend.target
+Before=suspend.target
+
+[Service]
+Type=notify
+NotifyAccess=main
+TimeoutStartSec=75
+Restart=on-failure
+RestartSec=5
+ExecStart=/usr/lib/thorch-motion/supervisor /var/lib/aynthor/motion/runtime-root
+User=root
+Group=root
+KillMode=control-group
+TimeoutStopSec=10
+UMask=0077
+NoNewPrivileges=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/aynthor/motion
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,26 @@
+/* Scoped GTK3 styling; system theme supplies light/dark colors. */
+.motion-lab {
+  background-color: @theme_bg_color;
+  color: @theme_fg_color;
+}
+.motion-lab button,
+.motion-lab combobox,
+.motion-lab checkbutton,
+.motion-lab expander title {
+  min-height: 44px;
+}
+.motion-lab button {
+  padding: 0 8px;
+}
+.motion-lab .numeric {
+  font-family: monospace;
+}
+.motion-lab .surface {
+  background-color: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+}
+.motion-lab .section-title {
+  font-weight: bold;
+}

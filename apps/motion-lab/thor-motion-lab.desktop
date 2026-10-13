@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Thor Motion Lab
+Comment=Inspect real SDL and Thor body motion; save user-local gyro bias
+Exec=thor-motion-lab
+Icon=input-gaming
+Terminal=false
+Categories=Utility;

@@ -1,0 +1,111 @@
+#!/usr/bin/python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Import an existing private runtime without inherited registry caches."""
+import argparse
+import os
+from pathlib import Path
+import re
+import shutil
+import stat
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--source', required=True, type=Path,
+                        help='existing private runtime root (not a partition)')
+    parser.add_argument('--destination', required=True, type=Path,
+                        help='new private runtime root; must not exist')
+    parser.add_argument('--calibration-directory', type=Path,
+                        help='original calibration directory within source; default sensors/registry')
+    parser.add_argument('--persist-file', action='append', default=[], type=Path,
+                        help='explicit non-registry regular file relative to sensors/')
+    args = parser.parse_args()
+    source = args.source.resolve(strict=True)
+    destination = args.destination.absolute()
+    if destination.exists() or destination.is_symlink():
+        parser.error('destination exists; refusing to overwrite')
+    if destination.resolve().is_relative_to(source):
+        parser.error('destination must be outside source')
+
+    def checked(path: Path) -> Path:
+        resolved = path.resolve(strict=True)
+        if not resolved.is_relative_to(source):
+            raise ValueError(f'symlink escapes private source: {path}')
+        return resolved
+
+    def copy(path: Path, target: Path, ancestors: frozenset[Path] = frozenset()) -> None:
+        if target.exists() or target.is_symlink():
+            raise ValueError(f'refusing to overwrite staged file: {target}')
+        resolved = checked(path)
+        mode = resolved.stat().st_mode
+        if stat.S_ISDIR(mode):
+            if resolved in ancestors:
+                raise ValueError(f'symlink cycle: {path}')
+            target.mkdir(mode=0o700)
+            for entry in sorted(resolved.iterdir()):
+                copy(entry, target / entry.name, ancestors | {resolved})
+        elif stat.S_ISREG(mode):
+            shutil.copy2(resolved, target)
+            target.chmod(0o600)
+        else:
+            raise ValueError(f'not a regular file or directory: {path}')
+
+    sensors = source / 'sensors'
+    conf = checked(sensors / 'sns_reg.conf').read_bytes()
+    version = checked(sensors / 'sns_reg_version').read_bytes()
+    match = re.search(rb'(?m)^version=([^\r\n\x00]+)', conf)
+    if not match or version.rstrip(b'\x00\r\n') != b'version=' + match[1]:
+        parser.error('source sns_reg.conf and sns_reg_version do not match')
+    calibration = args.calibration_directory or Path('sensors/registry')
+    calibration = calibration if calibration.is_absolute() else source / calibration
+    calibration = checked(calibration)
+    # '.temp.fac_cal' is a real temperature calibration group, not a scratch file.
+    seeds = [entry for entry in sorted(calibration.iterdir())
+             if '.fac_cal' in entry.name and not entry.name.endswith(('.temp', '.tmp'))
+             and checked(entry).is_file()]
+    if not seeds:
+        parser.error('no original .fac_cal files found; supply calibration directory')
+    for relative in args.persist_file:
+        if (relative.is_absolute() or '..' in relative.parts or not relative.parts
+                or relative.parts[0] in ('config', 'sns_reg.conf', 'sns_reg_version')
+                or any('registry' in part or '.temp' in part for part in relative.parts)):
+            parser.error('persist-file must select a non-registry, non-cache relative file')
+        selected = checked(sensors / relative)
+        sensor_root = checked(sensors)
+        if not selected.is_relative_to(sensor_root):
+            parser.error('persist-file must resolve within source sensors/')
+        canonical = selected.relative_to(sensor_root)
+        if (not canonical.parts or canonical.parts[0] in ('config', 'sns_reg.conf', 'sns_reg_version')
+                or any('registry' in part or '.temp' in part for part in canonical.parts)):
+            parser.error('persist-file resolves to registry, config or cache content')
+        if not selected.is_file():
+            parser.error('persist-file must be a regular file')
+
+    os.umask(0o077)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.mkdir(mode=0o700)  # Exclusive creation; no existing tree is replaced.
+    marker = destination / '.importing'
+    marker.touch()
+    # Failed staging is retained for inspection, with marker blocking service startup.
+    (destination / 'dsp').mkdir()
+    (destination / 'sensors').mkdir()
+    copy(source / 'dsp/adsp', destination / 'dsp/adsp')
+    copy(source / 'socinfo', destination / 'socinfo')
+    copy(sensors / 'config', destination / 'sensors/config')
+    for name in ('sns_reg.conf', 'sns_reg_version'):
+        copy(sensors / name, destination / 'sensors' / name)
+    registry = destination / 'sensors/registry'
+    registry.mkdir()
+    for entry in seeds:
+        copy(entry, registry / entry.name)
+    for relative in args.persist_file:
+        target = destination / 'sensors' / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        copy(sensors / relative, target)
+    marker.unlink()
+    print(f'Imported independent private runtime: {destination}; {len(seeds)} calibration files')
+    print('No registry generation, config filtering, source writes or service startup performed.')
+
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,77 @@
+--- a/src/libssc-cli.c
++++ b/src/libssc-cli.c
+@@ -84,7 +84,7 @@
+ 
+ static void accelerometer_measurement (SSCSensorAccelerometer *sensor, gfloat accel_x, gfloat accel_y, gfloat accel_z, gpointer user_data)
+ {
+-	g_printf ("Accelerometer sensor measurement: X=%f Y=%f Z=%f m/s²\n", accel_x, accel_y, accel_z);
++	g_printf ("Accelerometer sensor measurement: X=%f Y=%f Z=%f m/s² t_us=%" G_GINT64_FORMAT "\n", accel_x, accel_y, accel_z, g_get_monotonic_time ());
+ 	fflush(stdout);
+ }
+ 
+@@ -150,7 +150,7 @@
+ 
+ static void gyroscope_measurement (SSCSensorGyroscope *sensor, gfloat velocity_x, gfloat velocity_y, gfloat velocity_z, gpointer user_data)
+ {
+-	g_printf ("Gyroscope sensor measurement: X=%f Y=%f Z=%f rad/s\n", velocity_x, velocity_y, velocity_z);
++	g_printf ("Gyroscope sensor measurement: X=%f Y=%f Z=%f rad/s t_us=%" G_GINT64_FORMAT "\n", velocity_x, velocity_y, velocity_z, g_get_monotonic_time ());
+ 	fflush(stdout);
+ }
+ 
+@@ -165,11 +165,14 @@
+ 	gboolean debug = FALSE;
+ 	gchar *sensor_str = "";
+ 	gint64 timeout = DEFAULT_ENABLE_SECONDS;
++	gint sample_rate = 0;
++	gchar *sample_rate_str = NULL;
+ 	const GOptionEntry options[] = {
+ 		{ "version", 0, 0, G_OPTION_ARG_NONE, &print_version, "Print version information and exit.", NULL },
+ 		{ "debug", 'v', 0, G_OPTION_ARG_NONE, &debug, "Enable debug logs.", NULL },
+ 		{ "sensor", 0, 0, G_OPTION_ARG_STRING, &sensor_str, "Enable a sensor. Supported sensors: 'proximity', 'light', 'accelerometer', 'magnetometer', 'compass'", NULL },
+ 		{ "timeout", 0, 0, G_OPTION_ARG_INT64, &timeout, "Number of seconds before this will timeout [default 10]", NULL },
++		{ "sample-rate", 0, 0, G_OPTION_ARG_STRING, &sample_rate_str, "Request 1..200 Hz for accelerometer/gyroscope after discovery, before open", "HZ" },
+ 		{ NULL, 0, 0, G_OPTION_ARG_NONE, NULL, NULL, NULL }
+ 	};
+ 
+@@ -180,6 +183,19 @@
+ 		return GENERAL_FAIL_EXIT_CODE;
+ 	}
+ 
++	if (sample_rate_str != NULL) {
++		gchar *end = NULL;
++		gint64 requested = g_ascii_strtoll (sample_rate_str, &end, 10);
++		if (end == sample_rate_str || *end != '\0' || requested < 1 || requested > 200 ||
++		    (g_strcmp0 (sensor_str, "accelerometer") != 0 && g_strcmp0 (sensor_str, "gyroscope") != 0)) {
++			g_printerr ("--sample-rate must be 1..200 Hz and requires accelerometer or gyroscope\n");
++			g_free (sample_rate_str);
++			return GENERAL_FAIL_EXIT_CODE;
++		}
++		sample_rate = requested;
++		g_free (sample_rate_str);
++	}
++
+ 	/* Print version and exit */
+ 	if (print_version) {
+ 		printf ("libssc version %d.%d.%d\n", LIBSSC_MAJOR_VERSION, LIBSSC_MINOR_VERSION, LIBSSC_PATCH_VERSION);
+@@ -239,6 +255,10 @@
+ 			  	  "measurement",
+ 			  	  G_CALLBACK (accelerometer_measurement),
+ 			  	  NULL);
++		if (sample_rate > 0) {
++			ssc_sensor_set_sample_rate (SSC_SENSOR (accelerometer), sample_rate);
++			g_printerr ("Requested accelerometer rate: %d Hz (not a measured delivery rate)\n", sample_rate);
++		}
+ 		if (!ssc_sensor_accelerometer_open_sync (accelerometer, NULL, &err)) {
+ 			g_printf ("Unable to open accelerometer sensor: %s\n", err ? err->message : "UNKNOWN");
+ 			return OPEN_FAIL_EXIT_CODE;
+@@ -284,6 +304,10 @@
+ 			  	  "measurement",
+ 			  	  G_CALLBACK (gyroscope_measurement),
+ 			  	  NULL);
++		if (sample_rate > 0) {
++			ssc_sensor_set_sample_rate (SSC_SENSOR (gyroscope), sample_rate);
++			g_printerr ("Requested gyroscope rate: %d Hz (not a measured delivery rate)\n", sample_rate);
++		}
+ 		if (!ssc_sensor_gyroscope_open_sync (gyroscope, NULL, &err)) {
+ 			g_printf ("Unable to open gyroscope sensor: %s\n", err ? err->message : "UNKNOWN");
+ 			return OPEN_FAIL_EXIT_CODE;

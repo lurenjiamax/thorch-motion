@@ -1,0 +1,69 @@
+--- a/src/libssc-sensor.c
++++ b/src/libssc-sensor.c
+@@ -16,6 +16,8 @@
+  * along with this program. If not, see <https://www.gnu.org/licenses/>.
+  */
+ 
++#include <math.h>
++
+ #include "libssc-client-private.h"
+ #include "libssc-common-private.h"
+ #include "ssc-common.pb-c.h"
+@@ -23,6 +25,37 @@
+ #include "libssc-sensor.h"
+ 
+ #define MAX_RETRIES 100
++
++/* Engineering tolerance for rounded float metadata, not an SSC API limit.
++ * Require unit, orthogonal rows and |det| ~= 1; accept legacy handedness. */
++static gboolean
++mount_matrix_is_valid (const gfloat matrix[3][3])
++{
++	const gdouble tolerance = 0.01;
++	gdouble determinant;
++
++	for (gsize row = 0; row < 3; row++) {
++		for (gsize col = 0; col < 3; col++) {
++			if (!isfinite (matrix[row][col]))
++				return FALSE;
++		}
++	}
++
++	for (gsize row = 0; row < 3; row++) {
++		for (gsize other = row; other < 3; other++) {
++			gdouble dot = 0.0;
++			for (gsize col = 0; col < 3; col++)
++				dot += (gdouble) matrix[row][col] * matrix[other][col];
++			if (fabs (dot - (row == other ? 1.0 : 0.0)) > tolerance)
++				return FALSE;
++		}
++	}
++
++	determinant = (gdouble) matrix[0][0] * ((gdouble) matrix[1][1] * matrix[2][2] - (gdouble) matrix[1][2] * matrix[2][1])
++	            - (gdouble) matrix[0][1] * ((gdouble) matrix[1][0] * matrix[2][2] - (gdouble) matrix[1][2] * matrix[2][0])
++	            + (gdouble) matrix[0][2] * ((gdouble) matrix[1][0] * matrix[2][1] - (gdouble) matrix[1][1] * matrix[2][0]);
++	return fabs (fabs (determinant) - 1.0) <= tolerance;
++}
+ 
+ enum {
+ 	PROP_NAME = 1,
+@@ -444,13 +477,16 @@
+ 						}
+ 					}
+ 
+-					/* Fallback to identity matrix in case matrix is all 0 */
+-					if (all_zero) {
++					/* Never apply placeholder/scaled/nonfinite metadata as orientation. */
++					if (all_zero || !mount_matrix_is_valid (priv->mount_matrix)) {
+ 						memset (priv->mount_matrix, 0, sizeof (priv->mount_matrix));
+ 						priv->mount_matrix[0][0] = 1.0;
+ 						priv->mount_matrix[1][1] = 1.0;
+ 						priv->mount_matrix[2][2] = 1.0;
+-						g_warning ("Mount matrix provided by firmware is all 0, falling back to identity matrix!");
++						if (all_zero)
++							g_warning ("Mount matrix provided by firmware is all 0, falling back to identity matrix!");
++						else
++							g_warning ("Mount matrix provided by firmware is not a finite orthonormal orientation (tolerance 0.01), falling back to identity matrix!");
+ 					}
+ 					break;
+ 				}

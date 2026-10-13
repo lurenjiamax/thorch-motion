@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "id": "ayn-thor-sm8550",
+  "status": "verified-runtime-partial-acceptance",
+  "manufacturer": "AYN",
+  "model": "Thor",
+  "soc": "SM8550",
+  "imu": "SENODIA SH5001",
+  "fastrpc_device": "/dev/fastrpc-adsp",
+  "dsp_domain": "adsp",
+  "startup_order": ["SensorsPD", "RootPD"],
+  "readiness": ["accelerometer-sample", "gyroscope-sample"],
+  "physical_mount_verified": false,
+  "private_calibration_required": true,
+  "profile_loader_implemented": true
+}

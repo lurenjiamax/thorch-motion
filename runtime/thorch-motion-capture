@@ -1,0 +1,5 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Scoped to this child only; never change global libssc or loader configuration.
+exec /usr/bin/env LD_LIBRARY_PATH=/usr/lib/thorch-motion/ssc \
+    /usr/lib/thorch-motion/ssc/ssccli "$@"
