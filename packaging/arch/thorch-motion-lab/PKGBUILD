@@ -1,0 +1,18 @@
+# Maintainer: Thorch contributors
+pkgname=thorch-motion-lab
+pkgver=0.2.0
+pkgrel=4
+pkgdesc='Thor body and SDL controller motion inspection and user-local calibration'
+arch=(any)
+url='https://github.com/lurenjiamax/thorch'
+license=('GPL-3.0-or-later')
+depends=(python python-gobject python-cairo gtk3 sdl2-compat thorch-motion thorch-inputplumber)
+
+package() {
+  install -Dm644 "$startdir/payload/motion_lab.py" "$pkgdir/usr/share/thorch-motion-lab/motion_lab.py"
+  install -Dm644 "$startdir/payload/motion-lab.css" "$pkgdir/usr/share/thorch-motion-lab/motion-lab.css"
+  install -Dm755 "$startdir/payload/thor-motion-lab" "$pkgdir/usr/bin/thor-motion-lab"
+  install -Dm644 "$startdir/payload/thor-motion-lab.desktop" "$pkgdir/usr/share/applications/thor-motion-lab.desktop"
+  install -Dm644 "$startdir/payload/README.md" "$pkgdir/usr/share/doc/thorch-motion-lab/README.md"
+  install -Dm644 "$startdir/payload/LICENSE" "$pkgdir/usr/share/licenses/thorch-motion-lab/LICENSE"
+}

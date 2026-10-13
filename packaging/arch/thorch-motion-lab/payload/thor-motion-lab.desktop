@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Thor Motion Lab
+Name[zh_CN]=Thor 体感测试与校准
+Comment=Inspect real SDL and body sensors; save user-local calibration
+Exec=/usr/bin/thor-motion-lab
+Icon=input-gaming
+Terminal=false
+Categories=Utility;

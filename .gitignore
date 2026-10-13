@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 *.pkg.tar.*
+*.tar.gz
 *.log
 src/
 pkg/
