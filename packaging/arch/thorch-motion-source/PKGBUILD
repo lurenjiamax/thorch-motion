@@ -31,10 +31,10 @@ package() {
   install -Dm644 "$_ssc/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/libssc-LICENSE"
   install -Dm644 "$_root/README.md" "$pkgdir/usr/share/doc/$pkgname/README.md"
   install -d "$pkgdir/usr/share/doc/$pkgname/sources"
-  local name source
+  local name checkout
   for name in motion hexagonrpc libssc; do
-    case "$name" in motion) source=$_root;; hexagonrpc) source=$_rpc;; libssc) source=$_ssc;; esac
-    git -C "$source" rev-parse HEAD > "$pkgdir/usr/share/doc/$pkgname/sources/$name.commit"
+    case "$name" in motion) checkout=$_root;; hexagonrpc) checkout=$_rpc;; libssc) checkout=$_ssc;; esac
+    git -C "$checkout" rev-parse HEAD > "$pkgdir/usr/share/doc/$pkgname/sources/$name.commit"
   done
   # No private files, install hook, preset, or automatic service enablement.
 }
