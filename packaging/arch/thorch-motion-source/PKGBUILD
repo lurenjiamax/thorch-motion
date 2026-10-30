@@ -1,0 +1,40 @@
+pkgname=thorch-motion
+pkgver=0.5.0
+pkgrel=10
+pkgdesc='Optional Thor SSC runtime built from maintained source checkouts'
+arch=(aarch64)
+license=(GPL-3.0-or-later)
+depends=(glibc json-c python glib2 libqmi protobuf-c)
+makedepends=(gcc pkgconf protobuf)
+options=('!debug')
+_root="$(git -C "$startdir" rev-parse --show-toplevel)"
+_rpc="${THORCH_HEXAGONRPC_SOURCE:?Supply resolved hexagonrpc source}"
+_ssc="${THORCH_LIBSSC_SOURCE:?Supply resolved libssc source}"
+
+build() {
+  [[ "$(uname -m)" == aarch64 ]] || { echo 'Native ARM64 build required' >&2; return 1; }
+  cc $CFLAGS -I"$_rpc/include" "$_rpc"/libhexagonrpc/*.c "$_rpc"/hexagonrpcd/*.c \
+    $(pkg-config --cflags --libs json-c) $LDFLAGS -o "$srcdir/hexagonrpcd"
+  bash "$_root/packaging/arch/thorch-motion/payload/build-private-ssc.sh" \
+    "$_ssc" "$srcdir/private-ssc"
+}
+
+package() {
+  install -Dm755 "$srcdir/hexagonrpcd" "$pkgdir/usr/lib/thorch-motion/hexagonrpcd"
+  install -Dm755 "$srcdir/private-ssc/libssc.so.2" "$pkgdir/usr/lib/thorch-motion/ssc/libssc.so.2"
+  install -Dm755 "$srcdir/private-ssc/ssccli" "$pkgdir/usr/lib/thorch-motion/ssc/ssccli"
+  install -Dm755 "$_root/runtime/thorch-motion-import" "$pkgdir/usr/bin/thorch-motion-import"
+  install -Dm755 "$_root/runtime/thorch-motion-capture" "$pkgdir/usr/bin/thorch-motion-capture"
+  install -Dm755 "$_root/runtime/thorch-motion-supervisor" "$pkgdir/usr/lib/thorch-motion/supervisor"
+  install -Dm644 "$_root/systemd/thorch-motion.service" "$pkgdir/usr/lib/systemd/system/thorch-motion.service"
+  install -Dm644 "$_rpc/COPYING" "$pkgdir/usr/share/licenses/$pkgname/COPYING"
+  install -Dm644 "$_ssc/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/libssc-LICENSE"
+  install -Dm644 "$_root/README.md" "$pkgdir/usr/share/doc/$pkgname/README.md"
+  install -d "$pkgdir/usr/share/doc/$pkgname/sources"
+  local name source
+  for name in motion hexagonrpc libssc; do
+    case "$name" in motion) source=$_root;; hexagonrpc) source=$_rpc;; libssc) source=$_ssc;; esac
+    git -C "$source" rev-parse HEAD > "$pkgdir/usr/share/doc/$pkgname/sources/$name.commit"
+  done
+  # No private files, install hook, preset, or automatic service enablement.
+}

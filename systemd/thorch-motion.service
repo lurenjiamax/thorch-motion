@@ -5,8 +5,6 @@ ConditionPathExists=/var/lib/aynthor/motion/runtime-root/sensors/sns_reg_version
 ConditionPathExists=!/var/lib/aynthor/motion/runtime-root/.importing
 After=sound.target
 RequiresMountsFor=/var/lib/aynthor/motion/runtime-root
-Conflicts=suspend.target
-Before=suspend.target
 
 [Service]
 Type=notify
