@@ -48,6 +48,21 @@ def main() -> int:
     command = ['/usr/lib/thorch-motion/hexagonrpcd', '-f', device,
                '-d', domain, '-R', options.runtime]
     try:
+        runtime = Path(options.runtime)
+        while not stopping:
+            missing = []
+            if not Path(device).exists():
+                missing.append(device)
+            if not (runtime / 'sensors/sns_reg_version').is_file():
+                missing.append('sensor runtime configuration')
+            if (runtime / '.importing').exists():
+                missing.append('runtime import completion')
+            if not missing:
+                break
+            notify('STATUS=Waiting for ' + ', '.join(missing))
+            time.sleep(0.5)
+        if stopping:
+            return 0
         children.append(subprocess.Popen(command + ['-s']))
         deadline = time.monotonic() + 1
         while time.monotonic() < deadline and not stopping:

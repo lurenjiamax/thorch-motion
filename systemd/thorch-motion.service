@@ -1,15 +1,12 @@
 [Unit]
 Description=Experimental AYN Thor SSC sensor runtime
-ConditionPathExists=/dev/fastrpc-adsp
-ConditionPathExists=/var/lib/aynthor/motion/runtime-root/sensors/sns_reg_version
-ConditionPathExists=!/var/lib/aynthor/motion/runtime-root/.importing
 After=sound.target
 RequiresMountsFor=/var/lib/aynthor/motion/runtime-root
 
 [Service]
-Type=notify
+Type=exec
 NotifyAccess=main
-TimeoutStartSec=75
+TimeoutStartSec=10
 Restart=on-failure
 RestartSec=5
 ExecStart=/usr/lib/thorch-motion/supervisor /var/lib/aynthor/motion/runtime-root
